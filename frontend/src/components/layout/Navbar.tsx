@@ -4,6 +4,7 @@ import {
     LayoutGrid,
     CalendarClock,
     BarChart3,
+    BarChart2,
     Settings,
     UserCircle
 } from 'lucide-react';
@@ -42,12 +43,22 @@ export const Navbar = () => {
                         >
                             <BarChart3 size={18} /> Dashboards
                         </NavLink>
-                        <NavLink
-                            to="/config"
-                            className={({ isActive }) => clsx("flex items-center gap-2 hover:text-blue-200 transition", isActive && "text-blue-300 font-semibold border-b-2 border-blue-300")}
-                        >
-                            <Settings size={18} /> Config
-                        </NavLink>
+                        {currentUser?.role === 'engenheiro' && (
+                            <NavLink
+                                to="/performance"
+                                className={({ isActive }) => clsx("flex items-center gap-2 hover:text-blue-200 transition", isActive && "text-blue-300 font-semibold border-b-2 border-blue-300")}
+                            >
+                                <BarChart2 size={18} /> Desempenho
+                            </NavLink>
+                        )}
+                        {currentUser?.role === 'engenheiro' && (
+                            <NavLink
+                                to="/config"
+                                className={({ isActive }) => clsx("flex items-center gap-2 hover:text-blue-200 transition", isActive && "text-blue-300 font-semibold border-b-2 border-blue-300")}
+                            >
+                                <Settings size={18} /> Configuração
+                            </NavLink>
+                        )}
                     </div>
 
                     {/* Role Simulator */}

@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useStore } from '../../../store/useStore';
 import type { Task } from '../../../types';
-import { BadgeCheck, PlayCircle, AlertCircle, Ban } from 'lucide-react';
+import { BadgeCheck, PlayCircle, AlertCircle, Ban, ShieldCheck } from 'lucide-react';
 import { ModalStartTask } from './ModalStartTask';
+import { ModalConfirm } from '../../ui/ModalConfirm';
+import { toast } from 'sonner';
 
 const KanbanColumn = ({
     title,
@@ -44,9 +46,14 @@ const KanbanColumn = ({
                                     Reprovado
                                 </div>
                             )}
-                            {isIssue && (
+                            {isIssue && !task.manual_release && (
                                 <div className="absolute top-0 right-0 bg-red-100 text-red-600 px-2 py-1 text-[10px] uppercase font-bold rounded-bl flex items-center gap-1">
                                     <Ban size={10} /> Impedimento
+                                </div>
+                            )}
+                            {task.manual_release && (
+                                <div className="absolute top-0 right-0 bg-green-100 text-green-700 px-2 py-1 text-[10px] uppercase font-black rounded-bl flex items-center gap-1 border-b border-l border-green-200 shadow-sm z-30">
+                                    <ShieldCheck size={10} /> Liberado por Ing.
                                 </div>
                             )}
 
@@ -71,13 +78,20 @@ const KanbanColumn = ({
                                 </div>
                             )}
 
-                            {!isIssue && onAction && (
+                            {(!isIssue || task.manual_release) && onAction && (
                                 <button
                                     onClick={() => onAction(task)}
-                                    className="mt-2 w-full py-1.5 flex items-center justify-center gap-2 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-sm font-medium transition-colors"
+                                    className={`mt-2 w-full py-2 flex items-center justify-center gap-2 rounded-lg text-sm font-black uppercase tracking-tight transition-all active:scale-95 shadow-sm border ${actionLabel === 'Start' && task.manual_release
+                                        ? "bg-emerald-600 border-emerald-700 text-white hover:bg-emerald-700 shadow-emerald-100"
+                                        : "bg-blue-50 border-blue-100 text-blue-700 hover:bg-blue-100"
+                                        }`}
                                 >
-                                    {actionLabel === 'Start' ? <PlayCircle size={16} /> : <BadgeCheck size={16} />}
-                                    {actionLabel}
+                                    {actionLabel === 'Start' ? (
+                                        task.manual_release ? <ShieldCheck size={16} /> : <PlayCircle size={16} />
+                                    ) : (
+                                        <BadgeCheck size={16} />
+                                    )}
+                                    {actionLabel === 'Start' && task.manual_release ? "Iniciar (Liberado)" : actionLabel}
                                 </button>
                             )}
                         </div>
@@ -91,9 +105,10 @@ const KanbanColumn = ({
 export const ForemanKanban = () => {
     const { tasks, updateTaskStatus, currentUser } = useStore();
     const [startModalTask, setStartModalTask] = useState<Task | null>(null);
+    const [confirmFinishTask, setConfirmFinishTask] = useState<Task | null>(null);
 
-    // Filter tasks assigned to CURRENT USER (Multi-Foreman support)
-    const myTasks = tasks.filter(t => t.assigned_user_id === currentUser?.id);
+    // Filter tasks assigned to CURRENT USER (Multi-Foreman support) AND ONLY PUBLISHED
+    const myTasks = tasks.filter(t => t.assigned_user_id === currentUser?.id && t.is_published === true);
 
     // Columns Logic
     // To Do: Pending (Gray), Rejected (Orange), Issue (Red - showing here so they see it blocked)
@@ -102,13 +117,28 @@ export const ForemanKanban = () => {
     const doneTasks = myTasks.filter(t => t.status === 'ready_for_review');
 
     const handleStartClick = (task: Task) => {
-        if (task.status === 'issue') return; // Cannot start an issue directly
+        if (task.status === 'issue' && !task.manual_release) return; // Cannot start an issue directly unless released
+
+        if (task.manual_release) {
+            updateTaskStatus(task.id, 'in_progress');
+            toast.success("Tarefa iniciada com autorização especial do Engenheiro.", {
+                description: "Checks e impedimentos foram ignorados por liberação manual.",
+                duration: 4000
+            });
+            return;
+        }
+
         setStartModalTask(task);
     };
 
-    const handleFinish = (task: Task) => {
-        if (confirm('Marcar como Pronto para Inspeção?')) {
-            updateTaskStatus(task.id, 'ready_for_review');
+    const handleFinishRequest = (task: Task) => {
+        setConfirmFinishTask(task);
+    };
+
+    const handleFinishConfirm = () => {
+        if (confirmFinishTask) {
+            updateTaskStatus(confirmFinishTask.id, 'ready_for_review');
+            setConfirmFinishTask(null);
         }
     };
 
@@ -136,7 +166,7 @@ export const ForemanKanban = () => {
                     title="Em Andamento"
                     tasks={inProgressTasks}
                     color="border-blue-500"
-                    onAction={handleFinish}
+                    onAction={handleFinishRequest}
                     actionLabel="Marcar Pronto"
                 />
                 <KanbanColumn
@@ -152,6 +182,16 @@ export const ForemanKanban = () => {
                     onClose={() => setStartModalTask(null)}
                 />
             )}
+
+            <ModalConfirm
+                isOpen={!!confirmFinishTask}
+                onClose={() => setConfirmFinishTask(null)}
+                onConfirm={handleFinishConfirm}
+                title="Concluir Serviço"
+                message="Marcar como Pronto para Inspeção? Isso notificará o engenheiro."
+                confirmLabel="Confirmar"
+                variant="success"
+            />
         </div>
     );
 };

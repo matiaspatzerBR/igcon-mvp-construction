@@ -2,17 +2,26 @@ import { useState } from 'react';
 import { useStore } from '../../../store/useStore';
 import type { Task } from '../../../types';
 import { CheckCircle, XCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import { ModalConfirm } from '../../ui/ModalConfirm';
 
 export const InternQC = () => {
     const { tasks, zones, templates, approveTask, rejectTask } = useStore();
     const [rejectingId, setRejectingId] = useState<string | null>(null);
     const [reason, setReason] = useState('');
+    const [confirmApproveTask, setConfirmApproveTask] = useState<Task | null>(null);
 
     const reviewTasks = tasks.filter(t => t.status === 'ready_for_review');
 
-    const handleApprove = (task: Task) => {
-        if (confirm('Aprovar esta tarefa? Ela será marcada como Verde/Concluída.')) {
-            approveTask(task.id);
+    const handleApproveRequest = (task: Task) => {
+        setConfirmApproveTask(task);
+    };
+
+    const handleApproveConfirm = () => {
+        if (confirmApproveTask) {
+            approveTask(confirmApproveTask.id);
+            toast.success('Tarefa aprovada com sucesso!');
+            setConfirmApproveTask(null);
         }
     };
 
@@ -24,10 +33,11 @@ export const InternQC = () => {
     const confirmReject = () => {
         if (!rejectingId) return;
         if (!reason.trim()) {
-            alert('Por favor, informe o motivo da reprovação.');
+            toast.error('Por favor, informe o motivo da reprovação.');
             return;
         }
         rejectTask(rejectingId, reason);
+        toast.info('Tarefa reprovada. O mestre será notificado.');
         setRejectingId(null);
     };
 
@@ -76,7 +86,7 @@ export const InternQC = () => {
                                         <XCircle size={18} /> Reprovar
                                     </button>
                                     <button
-                                        onClick={() => handleApprove(task)}
+                                        onClick={() => handleApproveRequest(task)}
                                         className="flex-1 md:flex-none px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center justify-center gap-2 text-sm font-medium shadow-sm"
                                     >
                                         <CheckCircle size={18} /> Aprovar
@@ -112,6 +122,15 @@ export const InternQC = () => {
                     );
                 })}
             </div>
+
+            <ModalConfirm
+                isOpen={!!confirmApproveTask}
+                onClose={() => setConfirmApproveTask(null)}
+                onConfirm={handleApproveConfirm}
+                title="Confirmar Aprovação"
+                message="Deseja aprovar esta tarefa? Ela será marcada como concluída no sistema."
+                variant="success"
+            />
         </div>
     );
 };
